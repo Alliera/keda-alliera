@@ -68,6 +68,7 @@ type rabbitMQMetadata struct {
 	value                 float64       // trigger value (queue length or publish/sec. rate)
 	activationValue       float64       // activation value
 	host                  string        // connection string for either HTTP or AMQP protocol
+	allowSubpathsOnHost   bool          // specify if subpaths are allowed on the host
 	protocol              string        // either http or amqp protocol
 	vhostName             string        // override the vhost from the connection info
 	useRegex              bool          // specify if the queueName contains a rexeg
@@ -294,6 +295,15 @@ func parseRabbitMQHttpProtocolMetadata(config *ScalerConfig, meta *rabbitMQMetad
 		meta.excludeUnacknowledged = excludeUnacknowledged
 	}
 
+	// Resolve allowSubpathsOnHost
+	if val, ok := config.TriggerMetadata["allowSubpathsOnHost"]; ok {
+		allowSubpathsOnHost, err := strconv.ParseBool(val)
+		if err != nil {
+			return fmt.Errorf("allowSubpathsOnHost has invalid value")
+		}
+		meta.allowSubpathsOnHost = allowSubpathsOnHost
+	}
+
 	// Resolve pageSize
 	if val, ok := config.TriggerMetadata["pageSize"]; ok {
 		pageSize, err := strconv.ParseInt(val, 10, 64)
@@ -498,8 +508,10 @@ func (s *rabbitMQScaler) getQueueInfoViaHTTP() (*queueInfo, error) {
 		vhost = rabbitRootVhostPath
 	}
 
-	// Clear URL path to get the correct host.
-	parsedURL.Path = ""
+	// Clear URL path to get the correct host only when subpaths are not allowed.
+	if !s.metadata.allowSubpathsOnHost {
+		parsedURL.Path = ""
+	}
 
 	var getQueueInfoManagementURI string
 	if s.metadata.useRegex {
