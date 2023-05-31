@@ -54,8 +54,7 @@ To learn more about active deprecations, we recommend checking [GitHub Discussio
 
 ### Fixes
 
-- Added optional boolean field 'allowSubpathsOnHost' to the RabbitMQ scaler config, in order to allow/disallow subpaths in the RabbitMQ connection string
-  ([#2634](https://github.com/kedacore/keda/issues/2634))
+- **RabbitMQ Scaler**: Added optional boolean field 'allowSubpathsOnHost' to allow/disallow subpaths in the connection string ([#2634](https://github.com/kedacore/keda/issues/2634))
 
 ### Deprecations
 
