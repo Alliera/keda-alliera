@@ -68,7 +68,6 @@ type rabbitMQMetadata struct {
 	value                 float64       // trigger value (queue length or publish/sec. rate)
 	activationValue       float64       // activation value
 	host                  string        // connection string for either HTTP or AMQP protocol
-	allowSubpathsOnHost   bool          // specify if subpaths are allowed on the host
 	protocol              string        // either http or amqp protocol
 	vhostName             string        // override the vhost from the connection info
 	useRegex              bool          // specify if the queueName contains a rexeg
@@ -295,15 +294,6 @@ func parseRabbitMQHttpProtocolMetadata(config *ScalerConfig, meta *rabbitMQMetad
 		meta.excludeUnacknowledged = excludeUnacknowledged
 	}
 
-	// Resolve allowSubpathsOnHost
-	if val, ok := config.TriggerMetadata["allowSubpathsOnHost"]; ok {
-		allowSubpathsOnHost, err := strconv.ParseBool(val)
-		if err != nil {
-			return fmt.Errorf("allowSubpathsOnHost has invalid value")
-		}
-		meta.allowSubpathsOnHost = allowSubpathsOnHost
-	}
-
 	// Resolve pageSize
 	if val, ok := config.TriggerMetadata["pageSize"]; ok {
 		pageSize, err := strconv.ParseInt(val, 10, 64)
@@ -490,6 +480,22 @@ func getJSON(s *rabbitMQScaler, url string) (queueInfo, error) {
 	return result, fmt.Errorf("error requesting rabbitMQ API status: %s, response: %s, from: %s", r.Status, body, url)
 }
 
+func getVhostAndPathFromURL(urlPath, vhostName string) (string, string) {
+	parts := strings.Split(urlPath, "/")
+	subpaths := strings.Join(parts[:len(parts)-1], "/")
+
+	if vhostName == "" {
+		vhostName = parts[len(parts)-1]
+	}
+
+	vhostPath := "/" + url.QueryEscape(vhostName)
+
+	if vhostPath == "" || vhostPath == "/" || vhostPath == "//" {
+		vhostPath = rabbitRootVhostPath
+	}
+	return strings.ReplaceAll(subpaths, "//", ""), vhostPath
+}
+
 func (s *rabbitMQScaler) getQueueInfoViaHTTP() (*queueInfo, error) {
 	parsedURL, err := url.Parse(s.metadata.host)
 
@@ -497,27 +503,15 @@ func (s *rabbitMQScaler) getQueueInfoViaHTTP() (*queueInfo, error) {
 		return nil, err
 	}
 
-	// Extract vhost from URL's path.
-	vhost := parsedURL.Path
+	path, vhostPath := getVhostAndPathFromURL(parsedURL.Path, s.metadata.vhostName)
 
-	if s.metadata.vhostName != "" {
-		vhost = "/" + url.QueryEscape(s.metadata.vhostName)
-	}
-
-	if vhost == "" || vhost == "/" || vhost == "//" {
-		vhost = rabbitRootVhostPath
-	}
-
-	// Clear URL path to get the correct host only when subpaths are not allowed.
-	if !s.metadata.allowSubpathsOnHost {
-		parsedURL.Path = ""
-	}
+	parsedURL.Path = path
 
 	var getQueueInfoManagementURI string
 	if s.metadata.useRegex {
-		getQueueInfoManagementURI = fmt.Sprintf("%s/api/queues%s?page=1&use_regex=true&pagination=false&name=%s&page_size=%d", parsedURL.String(), vhost, url.QueryEscape(s.metadata.queueName), s.metadata.pageSize)
+		getQueueInfoManagementURI = fmt.Sprintf("%s/api/queues%s?page=1&use_regex=true&pagination=false&name=%s&page_size=%d", parsedURL.String(), vhostPath, url.QueryEscape(s.metadata.queueName), s.metadata.pageSize)
 	} else {
-		getQueueInfoManagementURI = fmt.Sprintf("%s/api/queues%s/%s", parsedURL.String(), vhost, url.QueryEscape(s.metadata.queueName))
+		getQueueInfoManagementURI = fmt.Sprintf("%s/api/queues%s/%s", parsedURL.String(), vhostPath, url.QueryEscape(s.metadata.queueName))
 	}
 
 	var info queueInfo
