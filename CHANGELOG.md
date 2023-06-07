@@ -54,7 +54,7 @@ To learn more about active deprecations, we recommend checking [GitHub Discussio
 
 ### Fixes
 
-- **RabbitMQ Scaler**: Added ability to support subpaths along with vhost in connection string ([#2634](https://github.com/kedacore/keda/issues/2634))
+**RabbitMQ Scaler**: Allow subpaths along with vhost in connection string ([#2634](https://github.com/kedacore/keda/issues/2634))
 
 ### Deprecations
 
