@@ -1,0 +1,29 @@
+steps:
+  - name: bash
+    args:
+      - touch
+      - .env_docker
+
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    env:
+      - 'BUILDKIT_PROGRESS=plain'
+    args:
+      - '-c'
+      - |
+          docker build \
+          --progress=plain \
+          -t europe-docker.pkg.dev/sandsiv-infrastructure/vochub/keda-metrics-apiserver:$_IMAGE_VERSION \
+          -f Dockerfile.adapter \
+          --build-arg BUILD_VERSION=$_IMAGE_VERSION \
+          --build-arg GIT_VERSION=$_IMAGE_VERSION \
+          --build-arg GIT_COMMIT=$_IMAGE_VERSION \
+          .
+
+timeout: 300s
+images:
+  - 'europe-docker.pkg.dev/sandsiv-infrastructure/vochub/keda-metrics-apiserver:$_IMAGE_VERSION'
+options:
+  machineType: N1_HIGHCPU_8
+substitutions:
+  _IMAGE_VERSION: ${TAG_NAME:-latest}
